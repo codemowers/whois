@@ -7,6 +7,7 @@ from sanic import Sanic
 from sanic.response import raw
 from prometheus_client import Gauge
 from sanic_prometheus import monitor
+from whois.parser import PywhoisError
 from whois import whois
 
 MAXSIZE = int(os.getenv("MAXSIZE", "10000"))
@@ -45,8 +46,11 @@ def normalize(obj):
 async def query(request, q):
     result = cache.get(q)
     if not result:
-        result = whois(q)
-        result["name_servers"] = normalize(result["name_servers"])
+        try:
+            result = whois(q)
+        except PywhoisError:
+            result = {}
+        result["name_servers"] = normalize(result.get("name_servers", []))
         result.pop("status", None)
         result.pop("domain_name", None)
         result = dict((k, v) for k, v in result.items() if v)
